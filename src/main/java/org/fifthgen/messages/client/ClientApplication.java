@@ -1,48 +1,81 @@
 package org.fifthgen.messages.client;
 
+import lombok.Data;
+
 import java.io.*;
 import java.net.Socket;
 import java.util.Scanner;
 
+@Data
 public class ClientApplication {
 
-    private static final String HOST = "localhost";
-    private static final int PORT = 1212;
+    private int serverPort;
+    private String serverHost;
 
+    public ClientApplication(String host, int port) {
 
-    public static void main(String[] args) {
-        try (Socket socket = new Socket(HOST, PORT)) {
-            if (socket.isConnected()) {
-                System.out.println("Connected to server on " + HOST + ":" + PORT);
-                System.out.println("Use Ctrl + z to close the connection");
-            }
+        this.serverHost = host;
+        this.serverPort = port;
+    }
 
-            try (var out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-                 Scanner scanner = new Scanner(System.in)) {
+    public void startClient() {
+        try (Socket socket = new Socket(serverHost, serverPort)) {
+            new Thread(() -> listenForMessages(socket)).start();
 
-                while (scanner.hasNextLine()) {
-                    new Thread(() -> {
-                        try (var in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-                            String line;
-                            while ((line = in.readLine()) != null) {
-                                System.out.println(line);
-                            }
-                        } catch (IOException e) {
-                            System.out.println("Error reading socket " + e.getLocalizedMessage());
-                        }
-                    }).start();
+            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+                 Scanner sc = new Scanner(System.in)) {
 
-                    String line = scanner.nextLine();
-                    out.write(line);
-                    out.flush();
+                // Get the client name from the user.
+                System.out.println("Connected to server at " + serverHost + ":" + serverPort);
+                System.out.print("Please provide a name: ");
+
+                // Send the client name to the server.
+                String clientName = sc.nextLine();
+                writeToServer(writer, clientName);
+
+                while (!socket.isClosed()) {
+                    String line = sc.nextLine();
+
+                    writeToServer(writer, line);
                 }
             } catch (IOException e) {
-                System.out.println("Error during transmission " + e.getLocalizedMessage());
+                System.out.println("Error reading socket output stream: " + e.getLocalizedMessage());
             }
-
-            System.out.println("Disconnected from server");
         } catch (IOException e) {
-            System.out.println("Couldn't create socket on" + HOST + ":" + PORT);
+            System.out.println("Error creating socket: " + e.getLocalizedMessage());
+        }
+    }
+
+    private void writeToServer(BufferedWriter writer, String msg) throws IOException {
+        if (msg != null && !msg.isBlank()) {
+            writer.write(msg);
+            writer.newLine();
+            writer.flush();
+        }
+    }
+
+    private void listenForMessages(Socket socket) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+            while (!socket.isClosed()) {
+                String response = reader.readLine();
+
+                if (response != null && !response.isEmpty()) {
+                    System.out.println(response);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Error reading client socket: " + e.getLocalizedMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        if (args.length < 2) {
+            System.out.println("Usage: client <host_name> <port>");
+        } else {
+            String host = args[0];
+            String port = args[1];
+
+            new ClientApplication(host, Integer.parseInt(port)).startClient();
         }
     }
 }
