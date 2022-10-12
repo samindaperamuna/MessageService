@@ -34,9 +34,9 @@ public class ServiceTestImpl {
             + "|^(((19|2[0-9])[0-9]{2})-(0[13578]|10|12)-(0[1-9]|[12][0-9]|3[01]))$"
             + "|^(((19|2[0-9])[0-9]{2})-(0[469]|11)-(0[1-9]|[12][0-9]|30))$";
 
-    protected Set<Track> tracks;
+    protected Set<Track> tracks = new HashSet<>();
 
-    protected ExecutorService executorService;
+    protected ExecutorService executorService = Executors.newFixedThreadPool(10);
 
     protected ServerApplication server;
 
@@ -48,8 +48,10 @@ public class ServiceTestImpl {
         new Thread(() -> server.startServer()).start();
 
         // Wait for clients to connect
+        System.out.println("Please connect the clients within 20 seconds");
+
         try {
-            Thread.sleep(60000);
+            Thread.sleep(20000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -64,18 +66,15 @@ public class ServiceTestImpl {
             return;
         }
 
-        tracks = new HashSet<>();
-        executorService = Executors.newFixedThreadPool(10);
-
-        TrackResponseValidator emailValidator = response -> RFC_5322_EMAIL_PATTERN.matches(response.getMessage());
-        TrackResponseValidator dateValidator = response -> GREGORIAN_DATE_PATTERN.matches(response.getMessage());
+        TrackResponseValidator emailValidator = response -> RFC_5322_EMAIL_PATTERN.matches(response.getMessage().trim());
+        TrackResponseValidator dateValidator = response -> GREGORIAN_DATE_PATTERN.matches(response.getMessage().trim());
         TrackResponseValidator allValidator = response -> true;
 
         for (var key : users.keySet()) {
             // -------------------------------------
             // Set up first track, contacting users.
             // -------------------------------------
-            Track initTrack = new Track(server, emailValidator, response -> {
+            Track initTrack = new Track(key, server, allValidator, response -> {
                 userEmails.put(response.getId(), response.getMessage());
             });
 
@@ -93,7 +92,7 @@ public class ServiceTestImpl {
             // ------------------------------------------------
             // Set up second track which schedules an interview
             // ------------------------------------------------
-            Track interviewTrack = new Track(server, dateValidator, response -> {
+            Track interviewTrack = new Track(key, server, allValidator, response -> {
                 userInterviewSchedules.put(response.getId(), response.getMessage());
             });
 
@@ -112,10 +111,8 @@ public class ServiceTestImpl {
             // ------------------------------------------------
             // Set up confirmation track
             // ------------------------------------------------
-            Track confirmationTrack = new Track(server, allValidator, null);
-            Node node = new Node(0, interviewConfirmation
-                    .replace("{user}", users.get(key))
-                    .replace("{date}", userInterviewSchedules.get(key)));
+            Track confirmationTrack = new Track(key, server, allValidator, null);
+            Node node = new Node(0, interviewConfirmation.replace("{user}", users.get(key)));
             confirmationTrack.addNode(node);
             interviewTrack.setNext(confirmationTrack);
             // ---------------------------------

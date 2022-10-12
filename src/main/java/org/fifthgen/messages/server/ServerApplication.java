@@ -14,22 +14,12 @@ public class ServerApplication {
 
     private final List<ServerClient> clients;
 
-    private ClientCallback clientCallback;
-
     public int getServerPort() {
         return serverPort;
     }
 
     public List<ServerClient> getClients() {
         return clients;
-    }
-
-    public ClientCallback getClientCallback() {
-        return clientCallback;
-    }
-
-    public void setClientCallback(ClientCallback clientCallback) {
-        this.clientCallback = clientCallback;
     }
 
     public ServerApplication(int port) {
@@ -49,7 +39,7 @@ public class ServerApplication {
                 String clientName = reader.readLine();
 
                 // Create a client instance which stores information about the connected client.
-                ServerClient client = new ServerClient(++clientCnt, clientName, socket, this.clientCallback);
+                ServerClient client = new ServerClient(++clientCnt, clientName, socket);
                 clients.add(client);
 
                 // Run the server client on its own thread
@@ -58,22 +48,6 @@ public class ServerApplication {
             }
         } catch (IOException e) {
             System.out.println("Error accepting client connection: " + e.getLocalizedMessage());
-        }
-    }
-
-    public void sendMsgToClient(ServerClient client, String msg) {
-        Socket socket = client.getSocket();
-
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))) {
-            if (!socket.isClosed()) {
-                writer.write(msg);
-                writer.newLine();
-                writer.flush();
-            } else {
-                System.out.println("Can't write to client. Socket is closed.");
-            }
-        } catch (IOException e) {
-            System.out.println("Failed to write to the client socket: " + e.getLocalizedMessage());
         }
     }
 

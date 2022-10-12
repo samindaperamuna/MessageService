@@ -15,7 +15,9 @@ public class Track implements Runnable, ClientCallback {
     private final Logger log;
     private final ServerApplication server;
     private final String id;
-    private final Stack<Node> nodes;
+
+    private final int clientRef;
+    private final List<Node> nodes;
     private final ExecutorService executorService;
     private int nodeDuration;
     private boolean isDone;
@@ -51,17 +53,17 @@ public class Track implements Runnable, ClientCallback {
     private final TrackResponseValidator validator;
     private final TrackResponseCallback responseCallback;
 
-    public Track(ServerApplication server, TrackResponseValidator validator, TrackResponseCallback responseCallback) {
+    public Track(int clientRef, ServerApplication server, TrackResponseValidator validator,
+                 TrackResponseCallback responseCallback) {
+
         this.id = UUID.randomUUID().toString();
+        this.clientRef = clientRef;
         this.log = Logger.getLogger(this.id);
-        this.nodes = new Stack<>();
+        this.nodes = new ArrayList<>();
         this.executorService = Executors.newFixedThreadPool(10);
         this.validator = validator;
         this.server = server;
 
-        // Set the server's client callback to this instance
-        // Responses from client nodes are received through the callback
-        this.server.setClientCallback(this);
         this.responseCallback = responseCallback;
     }
 
@@ -75,8 +77,9 @@ public class Track implements Runnable, ClientCallback {
     }
 
     private void executeNextNode() {
-        if (!nodes.empty()) {
-            Node node = nodes.pop();
+        if (!nodes.isEmpty()) {
+            Node node = nodes.get(0);
+            nodes.remove(node);
             nodeDuration = node.getDuration();
 
             executorService.execute(() -> execute(node));
@@ -92,7 +95,7 @@ public class Track implements Runnable, ClientCallback {
      */
     public void addNode(Node node) {
         node.setId(++nodeCounter);
-        this.nodes.push(node);
+        this.nodes.add(node);
     }
 
     /**
@@ -103,8 +106,10 @@ public class Track implements Runnable, ClientCallback {
 
         executorService.shutdown();
 
-        // Start the next track
-        this.next.run();
+        // Start the next track if available
+        if (this.next != null) {
+            this.next.run();
+        }
     }
 
     /**
@@ -116,23 +121,29 @@ public class Track implements Runnable, ClientCallback {
         node.setStartedAt(Instant.now());
 
         for (ServerClient client : server.getClients()) {
-            if (client.getId() == node.getId()) {
+            if (client.getId() == this.clientRef) {
+                // Register instance with the client for callback
+                client.setCallback(this);
                 log.info("Sending message to client: " + client.getName());
-                server.sendMsgToClient(client, node.getMessage());
+                client.sendMessage(node.getMessage());
 
                 break;
             }
         }
 
         // Time elapsed in seconds, node duration is in minutes
-        long timeElapsed = 0;
+        long timeElapsed = Duration.between(node.getStartedAt(), Instant.now()).toSeconds();
 
         // Block the thread till client response is received or time expires;
         while (trackResponse == null && (timeElapsed / 60) < nodeDuration) {
             // Recalculated time elapsed every 5 seconds
-            if (timeElapsed % 5 == 0) {
-                timeElapsed = Duration.between(Instant.now(), node.getStartedAt()).toSeconds();
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                System.out.println("Thread interrupted: " + e.getLocalizedMessage());
             }
+
+            timeElapsed = Duration.between(node.getStartedAt(), Instant.now()).toSeconds();
         }
 
         // Reset response and duration
@@ -165,8 +176,6 @@ public class Track implements Runnable, ClientCallback {
 
     @Override
     public void getClientResponse(Response response) {
-        if (validateNodeResponse(response)) {
-            this.trackResponse = response;
-        }
+        this.trackResponse = response;
     }
 }
