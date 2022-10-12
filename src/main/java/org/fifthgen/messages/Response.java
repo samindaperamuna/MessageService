@@ -6,8 +6,6 @@ import lombok.*;
 @RequiredArgsConstructor
 public class Response {
 
-    @Setter(AccessLevel.PACKAGE)
-    private int id;
-
+    private final int id;
     private final String message;
 }

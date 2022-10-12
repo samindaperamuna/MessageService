@@ -1,21 +1,36 @@
 package org.fifthgen.messages.server;
 
-import lombok.Data;
-
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
-@Data
 public class ServerApplication {
 
     private int clientCnt = 0;
 
-    private int serverPort;
+    private final int serverPort;
 
-    private List<ServerClient> clients;
+    private final List<ServerClient> clients;
+
+    private ClientCallback clientCallback;
+
+    public int getServerPort() {
+        return serverPort;
+    }
+
+    public List<ServerClient> getClients() {
+        return clients;
+    }
+
+    public ClientCallback getClientCallback() {
+        return clientCallback;
+    }
+
+    public void setClientCallback(ClientCallback clientCallback) {
+        this.clientCallback = clientCallback;
+    }
 
     public ServerApplication(int port) {
         this.serverPort = port;
@@ -34,7 +49,7 @@ public class ServerApplication {
                 String clientName = reader.readLine();
 
                 // Create a client instance which stores information about the connected client.
-                ServerClient client = new ServerClient(++clientCnt, clientName, socket);
+                ServerClient client = new ServerClient(++clientCnt, clientName, socket, this.clientCallback);
                 clients.add(client);
 
                 // Run the server client on its own thread
@@ -62,12 +77,12 @@ public class ServerApplication {
         }
     }
 
-    public static void main(String[] args) {
-        if (args.length < 1) {
-            System.out.println("Usage: server <port>");
-        } else {
-            String port = args[0];
-            new ServerApplication(Integer.parseInt(port)).startServer();
-        }
-    }
+//    public static void main(String[] args) {
+//        if (args.length < 1) {
+//            System.out.println("Usage: server <port>");
+//        } else {
+//            String port = args[0];
+//            new ServerApplication(Integer.parseInt(port)).startServer();
+//        }
+//    }
 }

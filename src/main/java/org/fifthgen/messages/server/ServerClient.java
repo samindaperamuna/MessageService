@@ -2,6 +2,7 @@ package org.fifthgen.messages.server;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import org.fifthgen.messages.Response;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -15,6 +16,8 @@ public class ServerClient implements Runnable {
     private String name;
     private Socket socket;
 
+    private ClientCallback callback;
+
     @Override
     public String toString() {
         return "Id: " + id + ", Address" + socket.getInetAddress().getHostAddress();
@@ -26,10 +29,14 @@ public class ServerClient implements Runnable {
 
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
             while (!socket.isClosed()) {
-                String response = reader.readLine();
+                String msg = reader.readLine();
 
-                if (response != null && !response.isBlank()) {
-                    System.out.println(name + ": " + response);
+                if (msg != null && !msg.isBlank()) {
+                    System.out.println(name + ": " + msg);
+
+                    // send msg in the  callback
+                    Response response = new Response(id, msg);
+                    this.callback.getClientResponse(response);
                 }
             }
         } catch (IOException e) {

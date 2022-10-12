@@ -2,7 +2,7 @@ package org.fifthgen.messages;
 
 import lombok.*;
 
-import java.util.Date;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -12,20 +12,21 @@ public class Node {
 
     // Node ID to track node with
     private int id;
-    private Date startTime;
+    private Instant startedAt;
 
-    // delay time unit is minutes
-    private int delay;
+    // Execution duration in minutes
+    private int duration;
     private String message;
     private Response response;
 
-    public Node(int delay, String message) {
-        this.delay = delay;
+    public Node(int duration, String message) {
+        this.duration = duration;
         this.message = message;
     }
 
     /**
      * Mock the final response (for testing purposes only).
+     *
      * @param response Response object to be set into final response.
      */
     public void mockResponse(Response response) {
