@@ -40,6 +40,8 @@ public class ServiceTestImpl {
 
     protected ServerApplication server;
 
+    protected int trackCnt = 0;
+
     private void init() {
         System.out.println("Starting server ...");
         server = new ServerApplication(PORT);
@@ -66,17 +68,14 @@ public class ServiceTestImpl {
             return;
         }
 
-        TrackResponseValidator emailValidator = response -> RFC_5322_EMAIL_PATTERN.matches(response.getMessage().trim());
-        TrackResponseValidator dateValidator = response -> GREGORIAN_DATE_PATTERN.matches(response.getMessage().trim());
-        TrackResponseValidator allValidator = response -> true;
-
         for (var key : users.keySet()) {
             // -------------------------------------
             // Set up first track, contacting users.
             // -------------------------------------
-            Track initTrack = new Track(key, server, allValidator, response -> {
-                userEmails.put(response.getId(), response.getMessage());
-            });
+            Track initTrack = new Track(++trackCnt, server);
+            initTrack.setClientRef(key);
+            initTrack.setValidator(response -> true);
+            initTrack.setResponseCallback(response -> userEmails.put(response.getId(), response.getMessage()));
 
             int delay = 0;
             for (String msg : initMsgs) {
@@ -92,9 +91,11 @@ public class ServiceTestImpl {
             // ------------------------------------------------
             // Set up second track which schedules an interview
             // ------------------------------------------------
-            Track interviewTrack = new Track(key, server, allValidator, response -> {
-                userInterviewSchedules.put(response.getId(), response.getMessage());
-            });
+            Track interviewTrack = new Track(++trackCnt, server);
+            interviewTrack.setClientRef(key);
+            interviewTrack.setValidator(response -> true);
+            interviewTrack.setResponseCallback(response -> userInterviewSchedules.put(response.getId(),
+                    response.getMessage()));
 
             delay = 0;
             for (String msg : interviewMsgs) {
@@ -111,7 +112,23 @@ public class ServiceTestImpl {
             // ------------------------------------------------
             // Set up confirmation track
             // ------------------------------------------------
-            Track confirmationTrack = new Track(key, server, allValidator, null);
+            Track confirmationTrack = new Track(++trackCnt, server);
+            confirmationTrack.setClientRef(key);
+            confirmationTrack.setDependsOnPrevTrack(true);
+            confirmationTrack.setValidator(response -> true);
+            confirmationTrack.setResponseCallback(new TrackResponseCallBackWithOnStart() {
+                @Override
+                public void onStart(Response response, List<Node> nodes) {
+                    // Replace date from the previous response
+                    nodes.forEach(node -> node.setMessage(node.getMessage().replace("{date}",
+                            response.getMessage())));
+                }
+
+                @Override
+                public void onSuccess(Response response) {
+                }
+            });
+
             Node node = new Node(0, interviewConfirmation.replace("{user}", users.get(key)));
             confirmationTrack.addNode(node);
             interviewTrack.setNext(confirmationTrack);

@@ -1,7 +1,6 @@
 package org.fifthgen.messages.server;
 
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Setter;
 import org.fifthgen.messages.Response;

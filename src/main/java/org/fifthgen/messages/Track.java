@@ -12,20 +12,32 @@ import java.util.logging.Logger;
 
 public class Track implements Runnable, ClientCallback {
 
-    private final Logger log;
+    private final Logger log = Logger.getLogger(this.getClass().getName());
+    private final List<Node> nodes = new ArrayList<>();
+    private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+    private final int id;
+    private int clientRef;
     private final ServerApplication server;
-    private final String id;
-
-    private final int clientRef;
-    private final List<Node> nodes;
-    private final ExecutorService executorService;
     private int nodeDuration;
     private boolean isDone;
     private Response trackResponse;
+    private Response prevTrackResponse;
     private int nodeCounter = 0;
+    private Track next;
+    private TrackResponseValidator validator;
+    private TrackResponseCallback responseCallback;
+    private boolean dependsOnPrevTrack;
 
-    public String getId() {
+    public int getId() {
         return id;
+    }
+
+    public int getClientRef() {
+        return clientRef;
+    }
+
+    public void setClientRef(int clientRef) {
+        this.clientRef = clientRef;
     }
 
     public boolean isDone() {
@@ -48,23 +60,33 @@ public class Track implements Runnable, ClientCallback {
         return validator;
     }
 
-    private Track next;
-
-    private final TrackResponseValidator validator;
-    private final TrackResponseCallback responseCallback;
-
-    public Track(int clientRef, ServerApplication server, TrackResponseValidator validator,
-                 TrackResponseCallback responseCallback) {
-
-        this.id = UUID.randomUUID().toString();
-        this.clientRef = clientRef;
-        this.log = Logger.getLogger(this.id);
-        this.nodes = new ArrayList<>();
-        this.executorService = Executors.newFixedThreadPool(10);
+    public void setValidator(TrackResponseValidator validator) {
         this.validator = validator;
-        this.server = server;
+    }
 
+    public TrackResponseCallback getResponseCallback() {
+        return responseCallback;
+    }
+
+    public void setResponseCallback(TrackResponseCallback responseCallback) {
         this.responseCallback = responseCallback;
+    }
+
+    protected void setPrevTrackResponse(Response response) {
+        this.prevTrackResponse = response;
+    }
+
+    public boolean getDependsOnPrevTrack() {
+        return dependsOnPrevTrack;
+    }
+
+    public void setDependsOnPrevTrack(boolean dependsOnPrevTrack) {
+        this.dependsOnPrevTrack = dependsOnPrevTrack;
+    }
+
+    public Track(int id, ServerApplication server) {
+        this.id = id;
+        this.server = server;
     }
 
     /**
@@ -72,6 +94,13 @@ public class Track implements Runnable, ClientCallback {
      */
     public void run() {
         log.info("Executing track: " + id + System.lineSeparator());
+
+        if (dependsOnPrevTrack) {
+            if (this.responseCallback instanceof TrackResponseCallBackWithOnStart) {
+                TrackResponseCallBackWithOnStart callback = (TrackResponseCallBackWithOnStart) this.responseCallback;
+                callback.onStart(prevTrackResponse, nodes);
+            }
+        }
 
         executeNextNode();
     }
@@ -108,6 +137,7 @@ public class Track implements Runnable, ClientCallback {
 
         // Start the next track if available
         if (this.next != null) {
+            this.next.setPrevTrackResponse(trackResponse);
             this.next.run();
         }
     }
@@ -176,6 +206,8 @@ public class Track implements Runnable, ClientCallback {
 
     @Override
     public void getClientResponse(Response response) {
-        this.trackResponse = response;
+        if (validateNodeResponse(response)) {
+            this.trackResponse = response;
+        }
     }
 }
