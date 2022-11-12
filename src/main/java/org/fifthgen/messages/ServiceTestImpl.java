@@ -80,8 +80,8 @@ public class ServiceTestImpl {
             int delay = 0;
             for (String msg : initMsgs) {
                 delay += 2;
-                Node node = new Node(delay, msg.replace("{user}", users.get(key)));
-                initTrack.addNode(node);
+                Step step = new Step(delay, msg.replace("{user}", users.get(key)));
+                initTrack.addNode(step);
             }
 
             // --------------------------
@@ -100,8 +100,8 @@ public class ServiceTestImpl {
             delay = 0;
             for (String msg : interviewMsgs) {
                 delay += 5;
-                Node node = new Node(delay, msg.replace("{user}", users.get(key)));
-                interviewTrack.addNode(node);
+                Step step = new Step(delay, msg.replace("{user}", users.get(key)));
+                interviewTrack.addNode(step);
             }
 
             initTrack.setNext(interviewTrack);
@@ -118,9 +118,9 @@ public class ServiceTestImpl {
             confirmationTrack.setValidator(response -> true);
             confirmationTrack.setResponseCallback(new TrackResponseCallBackWithOnStart() {
                 @Override
-                public void onStart(Response response, List<Node> nodes) {
+                public void onStart(Response response, List<Step> steps) {
                     // Replace date from the previous response
-                    nodes.forEach(node -> node.setMessage(node.getMessage().replace("{date}",
+                    steps.forEach(step -> step.setMessage(step.getMessage().replace("{date}",
                             response.getMessage())));
                 }
 
@@ -129,8 +129,8 @@ public class ServiceTestImpl {
                 }
             });
 
-            Node node = new Node(0, interviewConfirmation.replace("{user}", users.get(key)));
-            confirmationTrack.addNode(node);
+            Step step = new Step(0, interviewConfirmation.replace("{user}", users.get(key)));
+            confirmationTrack.addNode(step);
             interviewTrack.setNext(confirmationTrack);
             // ---------------------------------
             // End setting up confirmation track

@@ -9,4 +9,4 @@ Start the demo application by running the instance of `ServiceTestImpl` once. St
 
 #### Track Customization ####
 
-Tracks and nodes can be customized as needed as the implementation allows. Please refer to the test implementation for more information.
+Tracks and steps can be customized as needed as the implementation allows. Please refer to the test implementation for more information.

@@ -13,7 +13,7 @@ import java.util.logging.Logger;
 public class Track implements Runnable, ClientCallback {
 
     private final Logger log = Logger.getLogger(this.getClass().getName());
-    private final List<Node> nodes = new ArrayList<>();
+    private final List<Step> steps = new ArrayList<>();
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
     private final int id;
     private int clientRef;
@@ -98,7 +98,7 @@ public class Track implements Runnable, ClientCallback {
         if (dependsOnPrevTrack) {
             if (this.responseCallback instanceof TrackResponseCallBackWithOnStart) {
                 TrackResponseCallBackWithOnStart callback = (TrackResponseCallBackWithOnStart) this.responseCallback;
-                callback.onStart(prevTrackResponse, nodes);
+                callback.onStart(prevTrackResponse, steps);
             }
         }
 
@@ -106,12 +106,12 @@ public class Track implements Runnable, ClientCallback {
     }
 
     private void executeNextNode() {
-        if (!nodes.isEmpty()) {
-            Node node = nodes.get(0);
-            nodes.remove(node);
-            nodeDuration = node.getDuration();
+        if (!steps.isEmpty()) {
+            Step step = steps.get(0);
+            steps.remove(step);
+            nodeDuration = step.getDuration();
 
-            executorService.execute(() -> execute(node));
+            executorService.execute(() -> execute(step));
         }
     }
 
@@ -120,11 +120,11 @@ public class Track implements Runnable, ClientCallback {
      * of the track before it's being processed. Getters and setters to this field is disabled by design to allow
      * insertions of nodes only through this method.
      *
-     * @param node Node to be added to the internal stack
+     * @param step Node to be added to the internal stack
      */
-    public void addNode(Node node) {
-        node.setId(++nodeCounter);
-        this.nodes.add(node);
+    public void addNode(Step step) {
+        step.setId(++nodeCounter);
+        this.steps.add(step);
     }
 
     /**
@@ -145,24 +145,24 @@ public class Track implements Runnable, ClientCallback {
     /**
      * Execute the instructions in the node. Needs to be run on a separate thread.
      *
-     * @param node {@link Node} object to be executed
+     * @param step {@link Step} object to be executed
      */
-    private void execute(Node node) {
-        node.setStartedAt(Instant.now());
+    private void execute(Step step) {
+        step.setStartedAt(Instant.now());
 
         for (ServerClient client : server.getClients()) {
             if (client.getId() == this.clientRef) {
                 // Register instance with the client for callback
                 client.setCallback(this);
                 log.info("Sending message to client: " + client.getName());
-                client.sendMessage(node.getMessage());
+                client.sendMessage(step.getMessage());
 
                 break;
             }
         }
 
         // Time elapsed in seconds, node duration is in minutes
-        long timeElapsed = Duration.between(node.getStartedAt(), Instant.now()).toSeconds();
+        long timeElapsed = Duration.between(step.getStartedAt(), Instant.now()).toSeconds();
 
         // Block the thread till client response is received or time expires;
         while (trackResponse == null && (timeElapsed / 60) < nodeDuration) {
@@ -173,7 +173,7 @@ public class Track implements Runnable, ClientCallback {
                 System.out.println("Thread interrupted: " + e.getLocalizedMessage());
             }
 
-            timeElapsed = Duration.between(node.getStartedAt(), Instant.now()).toSeconds();
+            timeElapsed = Duration.between(step.getStartedAt(), Instant.now()).toSeconds();
         }
 
         // Reset response and duration

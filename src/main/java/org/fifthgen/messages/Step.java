@@ -8,7 +8,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public class Node {
+public class Step {
 
     // Node ID to track node with
     private int id;
@@ -19,7 +19,7 @@ public class Node {
     private String message;
     private Response response;
 
-    public Node(int duration, String message) {
+    public Step(int duration, String message) {
         this.duration = duration;
         this.message = message;
     }
